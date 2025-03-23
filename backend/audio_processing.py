@@ -64,7 +64,6 @@ async def generate_response(text: str) -> str:
         logger.error(f"Groq LLM generation failed: {e}")
         raise
 
-
 #TTS
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 async def synthesize_speech(text: str, output_path: str) -> str:
@@ -80,19 +79,11 @@ async def synthesize_speech(text: str, output_path: str) -> str:
             'ssml': 'false',
             'b64': 'true'
         }
-        # response = requests.get("https://api.voicerss.org/", params=payload)
         voice = voicerss_tts.speech(payload)
-
-        # import base64
-        # audio_data = base64.b64decode(voice['response'])
-        # audio = AudioSegment.from_file(io.BytesIO(audio_data), format="mp3")
-        # audio.export(output_path, format="mp3")
         audio_bytes = base64.b64decode(voice['response'])
         
-        # Write directly to output file
         with open(output_path, "wb") as f:
-            f.write(audio_bytes)
-            
+            f.write(audio_bytes)    
         return output_path
 
     except Exception as e:
