@@ -55,7 +55,7 @@ async def generate_response(text: str) -> str:
         chat = client.chat.completions.create(
             model=MODEL_NAME,
             messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "system", "content": "Please analyze the data and proviude an appropriate response"},
                 {"role": "user", "content": text}
             ]
         )
