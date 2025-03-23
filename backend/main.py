@@ -41,4 +41,4 @@ async def process_audio(file: UploadFile = File(...)):
 
 @app.get("/")
 def root():
-    return JSONResponse({"message": "Groq Audio AI is running."})
+    return JSONResponse({"message": "Audio Response processing using LLM."})

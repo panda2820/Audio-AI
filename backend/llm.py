@@ -2,14 +2,33 @@ import os
 import logging
 from dotenv import load_dotenv
 from groq import Groq
+import io
+from pydub import AudioSegment
+import voicerss_tts
 
 load_dotenv()
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-MODEL_NAME = "gemma-7b-it"
 
+VOICERSS_API_KEY = os.getenv("VOICERSS_API_KEY") 
+
+MODEL_NAME = "llama-3.3-70b-versatile"
+
+# LLM Testing 
+try:
+    client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+    # Test connection to LLM by making a simple request
+    test_response = client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=[{"role": "system", "content": "Test connection"}]
+    )
+    print("LLM connection successful: Test response received.")
+except Exception as e:
+    print(f"Failed to connect to LLM: {e}")
+    raise
+
+#STT
 async def transcribe_audio(file_path: str) -> str:
     """
     Transcribe audio using Groq's Whisper model.
@@ -23,9 +42,9 @@ async def transcribe_audio(file_path: str) -> str:
             )
         return transcription.text
     except Exception as e:
-        logger.error(f"Groq Whisper transcription failed: {e}")
-        raise
+        return(f"Groq Whisper transcription failed: {e}")
 
+#Response
 async def generate_response(text: str) -> str:
     """
     Generate text reply using Groq's Gemma model.
@@ -43,10 +62,30 @@ async def generate_response(text: str) -> str:
         logger.error(f"Groq LLM generation failed: {e}")
         raise
 
+
+#TTS
 async def synthesize_speech(text: str, output_path: str) -> str:
-    """
-    Stub: Plug in TTS engine like Coqui or Piper.
-    """
-    with open(output_path, "w") as f:
-        f.write(f"(TTS not yet implemented)\n{text}")
-    return output_path
+    try:
+        payload = {
+            'key': VOICERSS_API_KEY,
+            'hl': 'en-us',
+            'v': 'Linda',
+            'src': f'{text}',
+            'r': '0',
+            'c': 'mp3',
+            'f': '44khz_16bit_stereo',
+            'ssml': 'false',
+            'b64': 'true'
+        }
+        # response = requests.get("https://api.voicerss.org/", params=payload)
+        voice = voicerss_tts.speech(payload)
+
+        audio_data = base64.b64decode(voice['response'])
+        audio = AudioSegment.from_file(io.BytesIO(audio_data), format="mp3")
+        audio.export(output_path, format="mp3")
+
+        return output_path
+
+    except Exception as e:
+        logger.error(f"VoiceRSS TTS failed: {e}")
+        raise
