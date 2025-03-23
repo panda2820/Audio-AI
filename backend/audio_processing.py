@@ -1,33 +1,96 @@
 import os
-import shutil
-import uuid
-from fastapi import UploadFile, File
-from llm import transcribe_audio, generate_response, synthesize_speech
+import logging
+from dotenv import load_dotenv
+from groq import Groq
+import base64
+import voicerss_tts
 
-UPLOAD_DIR = "uploads"
-RESPONSE_DIR = "responses"
+load_dotenv()
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
-async def save_uploaded_file(upload_file: UploadFile, destination: str):
-    with open(destination, "wb") as buffer:
-        shutil.copyfileobj(upload_file.file, buffer)
 
-async def handle_audio_request(file: UploadFile):
-    file_ext = os.path.splitext(file.filename)[-1]
-    if file_ext.lower() not in [".mp3", ".wav", ".m4a"]:
-        raise ValueError("Unsupported file type")
+VOICERSS_API_KEY = os.getenv("VOICERSS_API_KEY") 
 
-    input_path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4()}{file_ext}")
-    await save_uploaded_file(file, input_path)
+MODEL_NAME = "llama-3.3-70b-versatile"
 
-    # Transcribe using Groq Whisper
-    transcript = await transcribe_audio(input_path)
+# LLM Testing 
+try:
+    client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+    # Test connection to LLM by making a simple request
+    test_response = client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=[{"role": "system", "content": "Test connection"}]
+    )
+    print("LLM connection successful: Test response received.")
+except Exception as e:
+    print(f"Failed to connect to LLM: {e}")
+    raise
 
-    # Generate response from Groq LLM
-    reply_text = await generate_response(transcript)
+#STT
+async def transcribe_audio(file_path: str) -> str:
+    """
+    Transcribe audio using Groq's Whisper model.
+    """
+    try:
+        with open(file_path, "rb") as file:
+            transcription = client.audio.transcriptions.create(
+                file=(file_path, file.read()),
+                model="whisper-large-v3-turbo",
+                response_format="verbose_json",
+            )
+        return transcription.text
+    except Exception as e:
+        return(f"Groq Whisper transcription failed: {e}")
 
-    # Generate reply audio (to be implemented)
-    output_filename = f"response_{uuid.uuid4()}.mp3"
-    output_path = os.path.join(RESPONSE_DIR, output_filename)
-    await synthesize_speech(reply_text, output_path)
+#Response
+async def generate_response(text: str) -> str:
+    """
+    Generate text reply using Groq's Gemma model.
+    """
+    try:
+        chat = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": text}
+            ]
+        )
+        return chat.choices[0].message.content.strip()
+    except Exception as e:
+        logger.error(f"Groq LLM generation failed: {e}")
+        raise
 
-    return output_path, reply_text
+
+#TTS
+async def synthesize_speech(text: str, output_path: str) -> str:
+    try:
+        payload = {
+            'key': VOICERSS_API_KEY,
+            'hl': 'en-us',
+            'v': 'Linda',
+            'src': f'{text}',
+            'r': '0',
+            'c': 'mp3',
+            'f': '44khz_16bit_stereo',
+            'ssml': 'false',
+            'b64': 'true'
+        }
+        # response = requests.get("https://api.voicerss.org/", params=payload)
+        voice = voicerss_tts.speech(payload)
+
+        # import base64
+        # audio_data = base64.b64decode(voice['response'])
+        # audio = AudioSegment.from_file(io.BytesIO(audio_data), format="mp3")
+        # audio.export(output_path, format="mp3")
+        audio_bytes = base64.b64decode(voice['response'])
+        
+        # Write directly to output file
+        with open(output_path, "wb") as f:
+            f.write(audio_bytes)
+            
+        return output_path
+
+    except Exception as e:
+        logger.error(f"VoiceRSS TTS failed: {e}")
+        raise

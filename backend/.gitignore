@@ -1,10 +1,14 @@
+# Environment variables
 .env
+*.env
 
+# Virtual environment
 venv/
 
+# Audio file directories
 uploads/
-
 responses/
 
+# Python cache files
 __pycache__/
 *.pyc
