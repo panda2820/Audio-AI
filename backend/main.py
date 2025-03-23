@@ -28,6 +28,8 @@ os.makedirs(RESPONSE_DIR, exist_ok=True)
 @app.post("/process-audio")
 async def process_audio(file: UploadFile = File(...)):
     try:
+        print("Processing started")
+
         output_path, reply_text = await handle_audio_request(file)
         sanitized_reply_text = reply_text.replace('\n', ' ').replace('\r', ' ')
 

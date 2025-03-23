@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from groq import Groq
 import base64
 import voicerss_tts
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -28,6 +29,7 @@ except Exception as e:
     raise
 
 #STT
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 async def transcribe_audio(file_path: str) -> str:
     """
     Transcribe audio using Groq's Whisper model.
@@ -44,6 +46,7 @@ async def transcribe_audio(file_path: str) -> str:
         return(f"Groq Whisper transcription failed: {e}")
 
 #Response
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 async def generate_response(text: str) -> str:
     """
     Generate text reply using Groq's Gemma model.
@@ -63,6 +66,7 @@ async def generate_response(text: str) -> str:
 
 
 #TTS
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 async def synthesize_speech(text: str, output_path: str) -> str:
     try:
         payload = {
